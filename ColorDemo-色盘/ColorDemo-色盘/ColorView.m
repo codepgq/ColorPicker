@@ -389,9 +389,11 @@ typedef void(^ColorViewProgressBlock)(CGFloat value);
 - (void)pickerView:(UIPickerView *)pickerView didSelectRow:(NSInteger)row inComponent:(NSInteger)component{
     if (self.nowColorBlock) {
         NSDictionary * dict = [[self nowColor] getHSBAValue];
-        UIColor * backColor = [UIColor colorWithHue:[dict[@"H"] floatValue] saturation:[dict[@"S"] floatValue] brightness:1.0 - row/100.0 alpha:1];
+        CGFloat brightness = 1 - (row )/125.0;
+        UIColor * backColor = [UIColor colorWithHue:[dict[@"H"] floatValue] saturation:[dict[@"S"] floatValue] brightness:brightness < 0.15 ? 0.18 : brightness alpha:1];
         self.nowColorBlock(backColor);
-        self.wBlock((255 / 100.0) * (100 - row));
+        CGFloat value = 0.01 * (100 - row);
+        self.wBlock(value);
     }
 }
 
@@ -455,8 +457,8 @@ typedef void(^ColorViewProgressBlock)(CGFloat value);
 - (void)resultOriginSlidImageView:(CGFloat)angle{
     
     
-    CGFloat nowAngle = angle < 45 ? 45: angle;
-    nowAngle = nowAngle > 135 ? 136 : nowAngle;
+    CGFloat nowAngle = angle < 43 ? 43: angle;
+    nowAngle = nowAngle > 137 ? 137 : nowAngle;
     
     CGFloat valueX = (self.pq_width - self.pq_width * 0.1) * 0.5 ;
     CGFloat valueY = (self.pq_height - self.pq_width * 0.1) * 0.5;
@@ -466,7 +468,7 @@ typedef void(^ColorViewProgressBlock)(CGFloat value);
     _saturationView.pq_origin = CGPointMake(x,y);
     
     if (self.nowColorBlock) {
-        CGFloat a = (nowAngle - 47) / 10000 * nowAngle;
+        CGFloat a = (nowAngle - 43) / 10000 * nowAngle;
         UIColor * backColor = [UIColor colorWithHue: _h saturation:1.0 - a brightness:1 alpha:1];
         self.nowColorBlock(backColor);
         
@@ -481,15 +483,17 @@ typedef void(^ColorViewProgressBlock)(CGFloat value);
         {
             //计算位置
             [self resultOriginSlidImageView:angle];
-        }break;
+            CGFloat nowAngle = angle < 43 ? 43: angle;
+            nowAngle = nowAngle > 144 ? 144 : nowAngle;
+            CGFloat a = (nowAngle - 43) / 10000 * nowAngle;
+            self.yBlock(a < 0.01 ? 0.01 : a);
+            break;
+        }
             
         case UIGestureRecognizerStateEnded:
         {
-            CGFloat nowAngle = angle < 45 ? 45: angle;
-            nowAngle = nowAngle > 135 ? 135 : nowAngle;
-            CGFloat a = (nowAngle - 47) / 10000 * nowAngle;
-            self.yBlock(a * 255.0);
-        }break;
+            break;
+        }
             
         default:
             break;
@@ -519,7 +523,7 @@ static CGFloat pToA (CGPoint loc, UIView* self) {
  @return 是否可以响应
  */
 - (BOOL)pointInside:(CGPoint)point withEvent:(nullable UIEvent *)event{
-    BOOL isTouch = point.y > self.frame.size.height * 0.5;
+    BOOL isTouch = point.y > self.frame.size.height * 0.7;
     //    NSLog(@"是否 (%d)",isTouch);
     return isTouch;
 }
@@ -690,7 +694,7 @@ typedef NS_ENUM(NSUInteger, DrawType) {
     //绘制渐变
     switch (type) {
         case whiteToBlack:
-            [self drawRadialGradient:gc path:path startColor:[UIColor colorWithWhite:1 alpha:0.8].CGColor endColor:[UIColor colorWithWhite:1 alpha:0.1].CGColor];
+            [self drawRadialGradient:gc path:path startColor:[UIColor colorWithWhite:1 alpha:0.4].CGColor endColor:[UIColor colorWithWhite:1 alpha:0.1].CGColor];
             break;
         case blackToWhite:
             [self drawRadialGradient:gc path:path startColor:[UIColor colorWithWhite:0 alpha:0.1].CGColor endColor:[UIColor colorWithWhite:1 alpha:0.5].CGColor];
@@ -747,7 +751,7 @@ typedef NS_ENUM(NSUInteger, DrawType) {
     CGContextDrawRadialGradient(context,
                                 gradient,
                                 center,
-                                center.x * 0.55,
+                                center.x * 0.52,
                                 center,
                                 center.x * 1.1,
                                 kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
@@ -916,10 +920,10 @@ typedef void(^ColorYWBlock)(CGFloat y,CGFloat w);
 @property (nonatomic, strong) ColorProgressView *progressView;
 ///当前颜色
 @property (nonatomic, strong) UIColor *nowColor;
-///色温参数
-@property (nonatomic, assign) CGFloat y;
-///色温参数
-@property (nonatomic, assign) CGFloat w;
+///色温参数 - 亮度
+@property (nonatomic, assign) CGFloat brightness;
+///色温参数 - 色温
+@property (nonatomic, assign) CGFloat hue;
 ///用来判断是否是选择色温中
 @property (nonatomic, assign) BOOL isSetYW;
 @end
@@ -965,8 +969,8 @@ typedef void(^ColorYWBlock)(CGFloat y,CGFloat w);
             self.pickerView = [[PickerView alloc] initWithFrame:self.bounds];
             [self addSubview:self.pickerView];
             
-            self.y = 125;
-            self.w = 125;
+            self.brightness = 1;
+            self.hue = 0.5;
         }
             break;
         case Hue_Brightness:
@@ -1031,9 +1035,11 @@ typedef void(^ColorYWBlock)(CGFloat y,CGFloat w);
     
     //返回YW 主要是 hue
     [self.sectorView getYValueBlock:^(CGFloat nowValue) {
-        weakSelf.y = nowValue > 255 ? 255 : nowValue;
+        weakSelf.hue = nowValue > 1 ? 1 : nowValue;
+        weakSelf.hue = weakSelf.hue < 0.01 ? 0.01 : weakSelf.hue;
+        weakSelf.brightness = 1;
         if (weakSelf.ybBlock) {
-            weakSelf.ybBlock(weakSelf.y / 255.0, weakSelf.w / 255.0);
+            weakSelf.ybBlock(weakSelf.brightness, weakSelf.hue);
         }
     }];
     
@@ -1050,9 +1056,10 @@ typedef void(^ColorYWBlock)(CGFloat y,CGFloat w);
         if (weakSelf.isSetYW == NO) {
             return ;
         }
-        weakSelf.w = nowValue > 255 ? 255 : nowValue;
+        weakSelf.brightness = nowValue > 1 ? 1 : nowValue;
+        weakSelf.brightness = weakSelf.brightness < 0.01 ? 0.01 : weakSelf.brightness;
         if (weakSelf.ybBlock) {
-            weakSelf.ybBlock(weakSelf.y / 255.0, weakSelf.w / 255.0);
+            weakSelf.ybBlock(weakSelf.brightness, weakSelf.hue);
         }
     }];
     
@@ -1067,7 +1074,7 @@ typedef void(^ColorYWBlock)(CGFloat y,CGFloat w);
     self.showColorblock = block;
 }
 
-- (void)nowYW:(void(^)(CGFloat y , CGFloat w))block{
+- (void)nowYW:(void(^)(CGFloat brightness , CGFloat hue))block{
     self.ybBlock = block;
 }
 
